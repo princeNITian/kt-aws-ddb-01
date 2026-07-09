@@ -208,7 +208,7 @@ Partition Key : sellerId
 Sort Key : createdAt
 ```
 
-Internal View
+### Internal View
 
 | sellerId | createdAt | productId |
 |-----------|-----------|-----------|
@@ -252,7 +252,7 @@ Partition Key : brand
 Sort Key : price
 ```
 
-Internal View
+### Internal View
 
 | brand | price | productId |
 |-------|-------|-----------|
@@ -279,43 +279,31 @@ new QueryCommand({
 
 ---
 
-# GSI 3 - Stock Index
+## GSI 3 - Seller Inventory Index
 
-## Requirement
+### Requirement
 
-Warehouse team wants to find products running low on stock.
+A seller wants to view all of their products ordered by available stock.
 
-Add an attribute:
-
-```
-stockStatus
-```
-
-Possible values:
-
-```
-LOW
-MEDIUM
-HIGH
-```
-
-Example
-
-| product | stock | stockStatus |
-|----------|-------|-------------|
-| P1001 | 20 | MEDIUM |
-| P2001 | 5 | LOW |
-| P1004 | 30 | HIGH |
+Instead of introducing a new attribute, we'll use the existing `stock` field.
 
 ### Create
 
 ```
-Index Name : StockIndex
+Index Name : SellerStockIndex
 
-Partition Key : stockStatus
+Partition Key : sellerId
 
 Sort Key : stock
 ```
+
+### Internal View
+
+| sellerId | stock | productId |
+|-----------|-------|-----------|
+| S101 | 5 | P2001 |
+| S101 | 20 | P1001 |
+| S101 | 30 | P1004 |
 
 ### Query
 
@@ -324,215 +312,75 @@ new QueryCommand({
 
     TableName: "Products",
 
-    IndexName: "StockIndex",
+    IndexName: "SellerStockIndex",
 
     KeyConditionExpression:
-        "stockStatus = :status",
+        "sellerId = :seller",
 
     ExpressionAttributeValues: {
-        ":status": "LOW"
+        ":seller": "S101"
     }
+
 });
 ```
 
----
-
-# GSI 4 - Rating Index
-
-## Requirement
-
-Find top-rated products.
-
-Create
+Result
 
 ```
-Index Name : RatingIndex
+MacBook
+iPhone
+Redmi Note
+```
 
-Partition Key : ratingBucket
+Since the sort key is `stock`, the seller immediately sees products with the lowest inventory first.
+
+## GSI 4 - Brand Rating Index
+
+### Requirement
+
+Customers want to see the highest-rated products for a particular brand.
+
+### Create
+
+```
+Index Name : BrandRatingIndex
+
+Partition Key : brand
 
 Sort Key : rating
 ```
 
-Example buckets
+### Internal View
 
-```
-5_STAR
-4_STAR
-3_STAR
-```
+| brand | rating | productId |
+|--------|--------|-----------|
+| Apple | 4.9 | P1001 |
+| Apple | 4.9 | P2001 |
+| Samsung | 4.8 | P1002 |
+| Vivo | 4.5 | P1003 |
 
----
+### Query
 
-# API Examples
+```javascript
+new QueryCommand({
 
-## Get all mobiles
+    TableName: "Products",
 
-```
-GET /products?category=Mobile
-```
+    IndexName: "BrandRatingIndex",
 
-Uses:
+    KeyConditionExpression:
+        "brand = :brand",
 
->Main Table
+    ExpressionAttributeValues: {
+            ":brand": "Apple"
+    },
 
----
-
-## Most expensive mobiles
-
-```
-GET /products?category=Mobile&sort=price
-```
-
-Uses:
-
->PriceLSI
-
----
-
-## Latest mobiles
-
-```
-GET /products?category=Mobile&sort=latest
+    ScanIndexForward: false
+});
 ```
 
-Uses:
-
->CreatedAtLSI
-
----
-
-## Products by Seller
+Result
 
 ```
-GET /products?sellerId=S101
+Highest-rated Apple products
 ```
-
-Uses:
-
->SellerIndex (GSI)
-
----
-
-## Products by Brand
-
-```
-GET /products?brand=Apple
-```
-
-Uses:
-
->BrandIndex (GSI)
-
----
-
-## Low Stock Products
-
-```
-GET /products?stockStatus=LOW
-```
-
-Uses:
-
->StockIndex (GSI)
-
----
-
-# Summary
-
-| Requirement | Uses |
-|--------------|------|
-| Products by category | Main Table |
-| Product by category + productId | Main Table |
-| Most expensive product in category | PriceLSI |
-| Latest products in category | CreatedAtLSI |
-| Products by seller | SellerIndex (GSI) |
-| Products by brand | BrandIndex (GSI) |
-| Low stock products | StockIndex (GSI) |
-
----
-
-# Production Recommendation
-
-The above design is excellent for learning DynamoDB indexes, but in a real production e-commerce application, product IDs are globally unique.
-
-A common production schema is:
-
-## Main Table
-
-```
-PK = productId
-```
-
-### GSIs
-
-```
-CategoryPriceIndex
-PK = category
-SK = price
-```
-
-```
-CategoryCreatedAtIndex
-PK = category
-SK = createdAt
-```
-
-```
-SellerIndex
-PK = sellerId
-SK = createdAt
-```
-
-```
-BrandIndex
-PK = brand
-SK = price
-```
-
-This design allows:
-
-- Direct lookup using `GetCommand`
-- Flexible filtering using GSIs
-- Better alignment with REST APIs (`GET /products/{productId}`)
-
----
-
-# Learning Recommendation
-
-To understand DynamoDB thoroughly, create two separate tables:
-
-### ProductsSimple
-
-```
-PK = productId
-```
-
-Practice:
-
-- CRUD APIs
-- GetCommand
-- Basic GSI usage
-
----
-
-### ProductsAdvanced
-
-```
-PK = category
-SK = productId
-```
-
-Practice:
-
-- QueryCommand
-- GSIs
-- LSIs
-- BETWEEN
-- begins_with
-- ScanIndexForward
-- FilterExpression
-- Pagination
-- Limit
-- LastEvaluatedKey
-
-This combination gives you both production knowledge and strong interview preparation.
