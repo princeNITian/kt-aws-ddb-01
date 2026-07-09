@@ -1,16 +1,19 @@
-# DynamoDB Products Table Design (Learning GSI & LSI)
+# DynamoDB Products Table Design (Learning Main Table, GSI & LSI)
 
-This design is intended for learning DynamoDB concepts such as:
+This project is designed to learn DynamoDB concepts in a practical way using an e-commerce application.
+
+By the end of this example, you'll understand:
 
 - Primary Key
 - Sort Key
+- QueryCommand
 - Local Secondary Index (LSI)
 - Global Secondary Index (GSI)
-- QueryCommand
 - ScanIndexForward
+- FilterExpression
 - BETWEEN
 - begins_with
-- FilterExpression
+- API Design using Query Parameters
 
 ---
 
@@ -22,14 +25,16 @@ Instead of using:
 PK = productId
 ```
 
-We'll use:
+We'll intentionally design the table to practice both GSI and LSI.
 
 ```
 Partition Key (PK) : category
 Sort Key (SK)      : productId
 ```
 
-## Sample Data
+---
+
+# Sample Data
 
 | category (PK) | productId (SK) | name | brand | sellerId | price | stock | rating | createdAt |
 |---------------|----------------|------|---------|-----------|--------|-------|---------|------------|
@@ -37,20 +42,25 @@ Sort Key (SK)      : productId
 | Mobile | P1002 | Galaxy S25 | Samsung | S102 | 79999 | 15 | 4.8 | 2026-07-02 |
 | Mobile | P1003 | Vivo P45 | Vivo | S103 | 30000 | 18 | 4.5 | 2026-07-04 |
 | Mobile | P1004 | Redmi Note | Xiaomi | S101 | 18000 | 30 | 4.2 | 2026-07-06 |
-| Laptop | P2001 | MacBook | Apple | S101 | 150000 | 5 | 4.9 | 2026-07-01 |
+| Laptop | P2001 | MacBook Pro | Apple | S101 | 150000 | 5 | 4.9 | 2026-07-01 |
 | Laptop | P2002 | Dell XPS | Dell | S104 | 120000 | 6 | 4.8 | 2026-07-03 |
-| Monitor | P3001 | Dell 27 | Dell | S104 | 35000 | 12 | 4.6 | 2026-07-02 |
+| Monitor | P3001 | Dell 27 Monitor | Dell | S104 | 35000 | 12 | 4.6 | 2026-07-02 |
 
 ---
 
 # Main Table Queries
 
-## 1. Get all Mobile products
+## Requirement 1
+
+> Show all Mobile products
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
     TableName: "Products",
-    KeyConditionExpression: "category = :category",
+
+    KeyConditionExpression:
+        "category = :category",
+
     ExpressionAttributeValues: {
         ":category": "Mobile"
     }
@@ -59,13 +69,17 @@ new QueryCommand({
 
 ---
 
-## 2. Get a specific product
+## Requirement 2
+
+> Get a specific product
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
     TableName: "Products",
+
     KeyConditionExpression:
         "category = :category AND productId = :productId",
+
     ExpressionAttributeValues: {
         ":category": "Mobile",
         ":productId": "P1001"
@@ -75,7 +89,9 @@ new QueryCommand({
 
 ---
 
-## 3. Get all Laptop products
+## Requirement 3
+
+> Show all Laptop products
 
 ```javascript
 category = Laptop
@@ -84,6 +100,12 @@ category = Laptop
 ---
 
 # Local Secondary Index (LSI)
+
+LSI allows us to use the **same partition key** but sort the data differently.
+
+---
+
+# LSI 1 - PriceLSI
 
 ## Requirement
 
@@ -95,19 +117,20 @@ The table is sorted by:
 productId
 ```
 
-but we want to sort by:
+But we want it sorted by:
 
 ```
 price
 ```
 
-### Create LSI
+### Create
 
 ```
 Index Name : PriceLSI
 
 Partition Key : category
-Sort Key      : price
+
+Sort Key : price
 ```
 
 ### Internal View
@@ -122,7 +145,7 @@ Sort Key      : price
 ### Query
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
 
     TableName: "Products",
 
@@ -150,11 +173,11 @@ iPhone 16
 
 ---
 
-# Another LSI
+# LSI 2 - CreatedAtLSI
 
 ## Requirement
 
-> Show newest Mobile products
+> Show the latest Mobile products.
 
 ### Create
 
@@ -166,10 +189,10 @@ Partition Key : category
 Sort Key : createdAt
 ```
 
-Query
+### Query
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
 
     TableName: "Products",
 
@@ -188,15 +211,25 @@ new QueryCommand({
 });
 ```
 
+Result
+
+```
+Latest Mobile products
+```
+
 ---
 
 # Global Secondary Index (GSI)
 
-## GSI 1 - Seller Index
+Unlike an LSI, a GSI can have a completely different partition key.
 
-### Requirement
+---
 
-Seller wants to see all of their products.
+# GSI 1 - SellerIndex
+
+## Requirement
+
+> Seller wants to see all of their products.
 
 ### Create
 
@@ -212,14 +245,14 @@ Sort Key : createdAt
 
 | sellerId | createdAt | productId |
 |-----------|-----------|-----------|
-| S101 | Jul1 | P1001 |
-| S101 | Jul1 | P2001 |
-| S101 | Jul6 | P1004 |
+| S101 | 2026-07-01 | P1001 |
+| S101 | 2026-07-01 | P2001 |
+| S101 | 2026-07-06 | P1004 |
 
 ### Query
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
 
     TableName: "Products",
 
@@ -236,11 +269,11 @@ new QueryCommand({
 
 ---
 
-# GSI 2 - Brand Index
+# GSI 2 - BrandIndex
 
 ## Requirement
 
-Show all Apple products.
+> Show all Apple products.
 
 ### Create
 
@@ -255,14 +288,14 @@ Sort Key : price
 ### Internal View
 
 | brand | price | productId |
-|-------|-------|-----------|
+|--------|-------|-----------|
 | Apple | 89999 | P1001 |
 | Apple |150000 | P2001 |
 
 ### Query
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
 
     TableName: "Products",
 
@@ -279,13 +312,13 @@ new QueryCommand({
 
 ---
 
-## GSI 3 - Seller Inventory Index
+# GSI 3 - SellerStockIndex
 
-### Requirement
+## Requirement
 
-A seller wants to view all of their products ordered by available stock.
+> Seller wants to see inventory ordered by available stock.
 
-Instead of introducing a new attribute, we'll use the existing `stock` field.
+We'll use the existing `stock` attribute.
 
 ### Create
 
@@ -308,7 +341,7 @@ Sort Key : stock
 ### Query
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
 
     TableName: "Products",
 
@@ -320,25 +353,26 @@ new QueryCommand({
     ExpressionAttributeValues: {
         ":seller": "S101"
     }
-
 });
 ```
 
 Result
 
 ```
-MacBook
-iPhone
+MacBook Pro
+iPhone 16
 Redmi Note
 ```
 
-Since the sort key is `stock`, the seller immediately sees products with the lowest inventory first.
+The seller immediately sees products with the lowest stock first.
 
-## GSI 4 - Brand Rating Index
+---
 
-### Requirement
+# GSI 4 - BrandRatingIndex
 
-Customers want to see the highest-rated products for a particular brand.
+## Requirement
+
+> Customer wants to see the highest-rated products for a brand.
 
 ### Create
 
@@ -362,7 +396,7 @@ Sort Key : rating
 ### Query
 
 ```javascript
-new QueryCommand({
+const command = new QueryCommand({
 
     TableName: "Products",
 
@@ -372,7 +406,7 @@ new QueryCommand({
         "brand = :brand",
 
     ExpressionAttributeValues: {
-            ":brand": "Apple"
+        ":brand": "Apple"
     },
 
     ScanIndexForward: false
@@ -384,3 +418,234 @@ Result
 ```
 Highest-rated Apple products
 ```
+
+---
+
+# API Examples
+
+## Get all Mobile products
+
+```
+GET /products?category=Mobile
+```
+
+Uses:
+
+>Main Table
+
+---
+
+## Most expensive Mobile
+
+```
+GET /products?category=Mobile&sort=price
+```
+
+Uses:
+
+>PriceLSI
+
+---
+
+## Latest Mobile
+
+```
+GET /products?category=Mobile&sort=latest
+```
+
+Uses:
+
+>CreatedAtLSI
+
+---
+
+## Products by Seller
+
+```
+GET /products?sellerId=S101
+```
+
+Uses:
+
+>SellerIndex
+
+---
+
+## Seller Inventory
+
+```
+GET /products?sellerId=S101&sort=stock
+```
+
+Uses:
+
+>SellerStockIndex
+
+---
+
+## Products by Brand
+
+```
+GET /products?brand=Apple
+```
+
+Uses:
+
+>BrandIndex
+
+---
+
+## Highest Rated Apple Products
+
+```
+GET /products?brand=Apple&sort=rating
+```
+
+Uses:
+
+>BrandRatingIndex
+
+---
+
+# Summary
+
+| Requirement | Uses |
+|--------------|------|
+| Products by category | Main Table |
+| Product by category + productId | Main Table |
+| Most expensive product in category | PriceLSI |
+| Latest products in category | CreatedAtLSI |
+| Products by seller | SellerIndex (GSI) |
+| Products by brand | BrandIndex (GSI) |
+| Seller inventory sorted by stock | SellerStockIndex (GSI) |
+| Highest-rated products of a brand | BrandRatingIndex (GSI) |
+
+---
+
+# Important Learning Note
+
+Every GSI and LSI in this document uses **attributes that already exist** in the table.
+
+Current attributes are:
+
+- category
+- productId
+- brand
+- sellerId
+- price
+- stock
+- rating
+- createdAt
+
+In real-world DynamoDB applications, developers often add **derived attributes** to support additional access patterns.
+
+Examples:
+
+```
+stockStatus = LOW | MEDIUM | HIGH
+
+ratingBucket = 5_STAR | 4_STAR
+```
+
+These attributes are **not automatically created by DynamoDB**.
+
+Your application computes and stores them while writing the item.
+
+This guide intentionally avoids derived attributes so that every example can be implemented directly using the current table schema.
+
+---
+
+# Production Recommendation
+
+The above design is excellent for learning DynamoDB indexes.
+
+However, most production e-commerce applications use:
+
+```
+PK = productId
+```
+
+because product IDs are globally unique.
+
+Typical GSIs are:
+
+```
+CategoryPriceIndex
+
+PK = category
+
+SK = price
+```
+
+```
+CategoryCreatedAtIndex
+
+PK = category
+
+SK = createdAt
+```
+
+```
+SellerIndex
+
+PK = sellerId
+
+SK = createdAt
+```
+
+```
+BrandIndex
+
+PK = brand
+
+SK = price
+```
+
+This allows:
+
+- Direct lookup using `GetCommand`
+- Flexible filtering using `QueryCommand`
+- REST API compatibility (`GET /products/{productId}`)
+
+---
+
+# Learning Recommendation
+
+For learning DynamoDB thoroughly, create two tables.
+
+## ProductsSimple
+
+```
+PK = productId
+```
+
+Practice:
+
+- CRUD APIs
+- GetCommand
+- Basic GSI
+
+---
+
+## ProductsAdvanced
+
+```
+PK = category
+
+SK = productId
+```
+
+Practice:
+
+- QueryCommand
+- GSIs
+- LSIs
+- BETWEEN
+- begins_with
+- FilterExpression
+- ScanIndexForward
+- Pagination
+- Limit
+- LastEvaluatedKey
+
+This combination gives you both production knowledge and strong interview preparation.
