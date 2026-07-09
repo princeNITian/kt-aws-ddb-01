@@ -2,6 +2,7 @@ import { PutCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/l
 import { docClient } from "../db.js";
 import { response } from "../response.js";
 import { PRODUCT_TABLE } from "../tables.js";
+import { getProductsByCategory } from "./gsi-example.js";
 
 async function createProduct(event) {
     const body = JSON.parse(event.body);

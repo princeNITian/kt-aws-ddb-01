@@ -1,7 +1,7 @@
 import { createUser, getUser, updateUser, deleteUser } from "./handlers/users.js";
 import { createProduct, getProduct, updateProduct, deleteProduct } from "./handlers/products.js";
 import { response } from "./response.js";
-
+import { getProductsByCategory } from "./handlers/gsi-example.js";
 
 export const handler = async (event) => {
     console.log("Received event:", JSON.stringify(event));
@@ -17,6 +17,8 @@ export const handler = async (event) => {
                 return await deleteUser(event);
             case "POST /products":
                 return await createProduct(event);
+            case "GET /products":
+                return await getProductsByCategory(event);
             case "GET /products/{productId}":
                 return await getProduct(event);
             case "PUT /products/{productId}":
